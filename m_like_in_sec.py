@@ -43,6 +43,8 @@ data_={
     'username': '',
     'password': '',
     'savestate': '1',
+    'pcid': '',
+    'pincode': '',
     'ec': '0',
     'pagerefer': 'http%3A%2F%2Fpassport.sina.cn%2Fsso%2Flogout%3Fentry%3Dmweibo%26r%3Dhttp%253A%252F%252Fm.weibo.cn',
     'entry': 'mweibo',
@@ -60,36 +62,53 @@ like_data={
     'attitude': 'heart',
 }
 
-#login
+cmt_data={
+    'content': '',
+    'id': '',
+    'st': '',
+}
+
 username = input('username: ')
 password = input('password: ')
 data_['username'] = username
 data_['password'] = password
 
 like_url = 'http://m.weibo.cn/attitudesDeal/add'
-url = 'https://login.sina.com.cn/sso/prelogin.php?checkpin=1&entry=mweibo&su=Yml1Yml1MDklNDAxMjYuY29t&callback=jsonpcallback1467307433925'
-try:
-    r0 = html.get(url, headers=headers_)
-    print('get #1, ok')
-except:
-    print('get #1 failed')
+cmt_url = 'http://m.weibo.cn/commentDeal/addCmt'
+init_url = 'https://passport.weibo.cn/signin/login?entry=mweibo&res=wel&wm=3349&r=http://m.weibo.cn/'
 
+rr = html.get(init_url, headers=headers_)
+
+# get pincode and pcid
+url_image = 'https://passport.weibo.cn/captcha/image'
+ra = html.get(url_image)
+rj = ra.json()
+data_['pcid'] = rj['data']['pcid']
+print(ra.text)
+data_['pincode'] = input('pincode: ')
+
+# login
 url_pass = 'https://passport.weibo.cn/sso/login'
-try:
-    r1 = html.post(url_pass, headers=headers1, data=data_)
-    print('login, ok')
-except:
-    print('login failed')
+r1 = html.post(url_pass, headers=headers1, data=data_)
+print(r1.text)
 
 uid = input('uid: ')
 
+# collect st and content
+st_f = ''
+
+cmt_data['content'] = input('comment: ')
 try:
     r2 = html.get('http://m.weibo.cn', headers=headers_)
+    st_f = re.findall(r'(?<=\"st\":\")[0-9]+(?=\")', r2.text)
+    # print('st:' + st_f[0])
     print('get #2, ok')
 except:
     print('get #2, failed')
+cmt_data['st'] = st_f
 
-filename = uid + '.txt'   # 文件以uid.txt命名, 里面存mid列表
+
+filename = uid + '_cmt.txt'   # 文件以uid.txt命名, 里面存mid列表
 if os.path.exists(filename):     # 文件存在, 先读入更新列表
     file = open(filename, 'r+')
     while True:
@@ -106,7 +125,7 @@ else:                           # 文件不存在, 创建新文件
 def loop():
     r2 = html.get('http://m.weibo.cn/index/feed?format=cards', headers=headers_)
     a = r2.json()
-
+    # print(a)
     # deal with json package
     for item in a[0]['card_group']:
         if str(item['mblog']['user']['id']) == uid:
@@ -115,14 +134,18 @@ def loop():
                 list.append(mid)
                 file.write(mid + '\n')
                 like_data['id'] = mid
-                rr = html.post(like_url, headers=headers_l, data=like_data)
-                print('like:', item['mblog']['mid'])
+                cmt_data['id'] = mid
+                comnt = html.post(cmt_url, headers=headers_l, data=cmt_data)  # post comment
+                print('post comment, done')
+                exit(0)
+                rr = html.post(like_url, headers=headers_l, data=like_data)  # post heart
+                # print('like:', item['mblog']['mid'])
 
 
 while True:
     try:
         loop()
     except:
-        print('loop, failed')
+        print('loop failed')
     time.sleep(10)
 
